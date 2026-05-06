@@ -2,30 +2,39 @@ import streamlit as st
 import pandas as pd
 import folium
 from streamlit_folium import st_folium
+import os
 
-# Configuración inicial
-st.set_page_config(page_title="Gestión de Talleres Ecuador", layout="wide")
+# 1. Configuración inicial de la página
+st.set_page_config(page_title="Sistema Nacional de Talleres", layout="wide")
 
-# Estilo personalizado para mejorar la visibilidad
+# 2. Estilo personalizado (Modo Oscuro)
 st.markdown("""
     <style>
     .main { background-color: #0e1117; }
     .stSelectbox, .stTextInput { color: white; }
+    div[data-testid="stExpander"] { background-color: #161b22; border: 1px solid #30363d; }
     </style>
     """, unsafe_allow_html=True)
 
-st.title("🛠️ Sistema de Talleres y Cobertura Nacional")
+st.title("🛠️ Gestión de Talleres y Cobertura Nacional")
 
-# Función para cargar y procesar los datos
+# 3. Función para cargar datos
 @st.cache_data
 def cargar_datos():
-    # Leer el archivo CSV cargado
-    df = pd.read_csv("DATOS ST 04 2026 (4).xlsx - Respuestas de formulario 1.csv")
+    # Usamos el nombre de archivo sugerido para GitHub
+    file_name = "base_datos_talleres.csv"
     
-    # Limpiar nombres de ciudad para cruzar con las coordenadas
-    df['CIUDAD BASE LIMPIA'] = df['CIUDAD BASE'].astype(str).str.upper().str.strip()
+    if not os.path.exists(file_name):
+        st.error(f"❌ No se encontró el archivo '{file_name}'. Asegúrate de renombrarlo y subirlo a GitHub.")
+        return pd.DataFrame()
+
+    # Cargar el CSV
+    df = pd.read_csv(file_name)
     
-    # Diccionario de coordenadas aproximadas para las ciudades encontradas en el CSV
+    # Limpiar nombres de ciudad para el mapeo
+    df['CIUDAD_BUSQUEDA'] = df['CIUDAD BASE'].astype(str).str.upper().str.strip()
+    
+    # Diccionario de coordenadas para las ciudades de tu base de datos
     coordenadas = {
         'AMBATO': (-1.2417, -78.6195),
         'TUNGURAHUA - AMBATO': (-1.2417, -78.6195),
@@ -33,7 +42,7 @@ def cargar_datos():
         'DURAN': (-2.1701, -79.8220),
         'EL COCA': (-0.4667, -76.9833),
         'GUAYAQUIL': (-2.1894, -79.8891),
-        'GUYAQUIL': (-2.1894, -79.8891), # Contemplando posible error de tipeo en base
+        'GUYAQUIL': (-2.1894, -79.8891),
         'IBARRA': (0.3517, -78.1223),
         'LAGO AGRIO': (0.0860, -76.8820),
         'LOJA': (-3.9931, -79.2042),
@@ -51,101 +60,75 @@ def cargar_datos():
         'SANTO DOMINGO': (-0.2530, -79.1754)
     }
     
-    # Asignar Latitud y Longitud
-    df['Lat'] = df['CIUDAD BASE LIMPIA'].map(lambda x: coordenadas.get(x, (0, 0))[0])
-    df['Lon'] = df['CIUDAD BASE LIMPIA'].map(lambda x: coordenadas.get(x, (0, 0))[1])
+    # Asignar coordenadas (Ecuador por defecto si no encuentra la ciudad)
+    df['Lat'] = df['CIUDAD_BUSQUEDA'].map(lambda x: coordenadas.get(x, (-1.8312, -78.1834))[0])
+    df['Lon'] = df['CIUDAD_BUSQUEDA'].map(lambda x: coordenadas.get(x, (-1.8312, -78.1834))[1])
     
-    # Filtrar o descartar aquellos que no tengan coordenadas asignadas
-    df = df[df['Lat'] != 0]
-    
-    # Rellenar valores nulos para evitar errores en Streamlit
-    df = df.fillna('No especificado')
-    
-    return df
+    return df.fillna('No disponible')
 
+# Ejecutar carga
 df = cargar_datos()
 
-# --- SIDEBAR: BUSCADOR Y LISTA ---
-st.sidebar.header("⚙️ Opciones de Filtro")
-
-# Buscador de texto automático (por taller, ciudad o cobertura)
-busqueda = st.sidebar.text_input("🔍 Buscar Taller, Ciudad o Cobertura:", "").strip().upper()
-
-# Lista desplegable
-nombres_taller = ["TODOS"] + sorted(df["NOMBRE DEL TALLER (MAYUSCULAS)"].unique().tolist())
-seleccion_lista = st.sidebar.selectbox("Seleccione el Taller:", nombres_taller)
-
-# Lógica de filtrado combinada
-if busqueda:
-    df_filtrado = df[
-        df["NOMBRE DEL TALLER (MAYUSCULAS)"].str.upper().str.contains(busqueda) | 
-        df["CIUDAD BASE"].str.upper().str.contains(busqueda) |
-        df["COBERTURA INST AA Y LINEA BLANCA"].str.upper().str.contains(busqueda)
-    ]
-else:
-    if seleccion_lista == "TODOS":
+if not df.empty:
+    # --- SIDEBAR: BUSCADOR ---
+    st.sidebar.header("🔍 Filtros de Red")
+    busqueda = st.sidebar.text_input("Buscar Taller, Ciudad o Línea:", "").strip().upper()
+    
+    # Lógica de filtrado
+    if busqueda:
+        df_filtrado = df[
+            df["NOMBRE DEL TALLER (MAYUSCULAS)"].str.upper().str.contains(busqueda) | 
+            df["CIUDAD BASE"].str.upper().str.contains(busqueda) |
+            df["LINEAS QUE MANEJAN"].str.upper().str.contains(busqueda)
+        ]
+    else:
         df_filtrado = df
-    else:
-        df_filtrado = df[df["NOMBRE DEL TALLER (MAYUSCULAS)"] == seleccion_lista]
 
-# --- VISUALIZACIÓN ---
-col_map, col_info = st.columns([2, 1])
+    # --- LAYOUT: MAPA Y DETALLES ---
+    col_map, col_info = st.columns([2, 1])
 
-with col_map:
-    # Determinar centro y zoom del mapa según los resultados
-    if len(df_filtrado) == 1:
-        centro = [df_filtrado["Lat"].iloc[0], df_filtrado["Lon"].iloc[0]]
-        zoom = 12
-    elif len(df_filtrado) > 1 and len(df_filtrado) < len(df):
-        centro = [df_filtrado["Lat"].mean(), df_filtrado["Lon"].mean()]
-        zoom = 8
-    else:
-        centro = [-1.8312, -78.1834] # Centro de Ecuador
-        zoom = 7
+    with col_map:
+        # Centrar el mapa dinámicamente
+        centro = [df_filtrado["Lat"].mean(), df_filtrado["Lon"].mean()] if not df_filtrado.empty else [-1.8312, -78.1834]
+        
+        m = folium.Map(location=centro, zoom_start=7, tiles="CartoDB dark_matter")
+        
+        for _, r in df_filtrado.iterrows():
+            pop_html = f"""
+            <div style='color: black; font-family: Arial;'>
+                <b>{r['NOMBRE DEL TALLER (MAYUSCULAS)']}</b><br>
+                <b>Telf:</b> {r['NUMEROS DE CONTACTO']}<br>
+                <b>Líneas:</b> {r['LINEAS QUE MANEJAN']}
+            </div>
+            """
+            folium.CircleMarker(
+                location=[r['Lat'], r['Lon']],
+                radius=8, color='#00FF00', fill=True, fill_color='#00FF00',
+                popup=folium.Popup(pop_html, max_width=250)
+            ).add_to(m)
+        
+        st_folium(m, width="100%", height=500)
 
-    m = folium.Map(location=centro, zoom_start=zoom, tiles="CartoDB dark_matter")
-    
-    for _, r in df_filtrado.iterrows():
-        popup_html = f"""
-        <div style='color: black;'>
-            <b>{r['NOMBRE DEL TALLER (MAYUSCULAS)']}</b><br>
-            <b>Ciudad:</b> {r['CIUDAD BASE']}<br>
-            <b>Líneas:</b> {r['LINEAS QUE MANEJAN']}<br>
-            <b>Contacto:</b> {r['NUMEROS DE CONTACTO']}<br>
-            <hr>
-            <b>Cobertura:</b> {r['COBERTURA INST AA Y LINEA BLANCA']}
-        </div>
-        """
-        # Cambié el color a verde para diferenciarlo del mapa anterior si gustas
-        folium.CircleMarker(
-            location=[r['Lat'], r['Lon']],
-            radius=9, color='#00ff00', fill=True, fill_color='#00ff00', fill_opacity=0.8,
-            popup=folium.Popup(popup_html, max_width=300)
-        ).add_to(m)
-    
-    st_folium(m, width="100%", height=500)
+    with col_info:
+        if len(df_filtrado) == 1:
+            row = df_filtrado.iloc[0]
+            st.success(f"📍 {row['NOMBRE DEL TALLER (MAYUSCULAS)']}")
+            st.write(f"**Ciudad:** {row['CIUDAD BASE']}")
+            st.write(f"**Contacto:** {row['NUMEROS DE CONTACTO']}")
+            st.write(f"**Líneas:** {row['LINEAS QUE MANEJAN']}")
+            st.warning(f"**Cobertura:** {row['COBERTURA INST AA Y LINEA BLANCA']}")
+        elif len(df_filtrado) > 1:
+            st.info(f"Se encontraron {len(df_filtrado)} talleres en esta selección.")
+        else:
+            st.error("No se encontraron coincidencias.")
 
-with col_info:
-    if len(df_filtrado) == 1:
-        row = df_filtrado.iloc[0]
-        st.success(f"📍 Taller: {row['NOMBRE DEL TALLER (MAYUSCULAS)']}")
-        st.write(f"**Ciudad Base:** {row['CIUDAD BASE']}")
-        st.write(f"**Dirección:** {row['DIRECCION ']}")
-        st.write(f"**Teléfonos:** {row['NUMEROS DE CONTACTO']}")
-        st.write(f"**Líneas que manejan:** {row['LINEAS QUE MANEJAN']}")
-        st.write(f"**Email:** {row['CORREOS ELECTRONICOS ']}")
-        st.warning(f"**Cobertura de Instalación:** {row['COBERTURA INST AA Y LINEA BLANCA']}")
-    elif len(df_filtrado) > 1:
-        st.info(f"Se encontraron {len(df_filtrado)} resultados. Selecciona uno en el mapa o en el filtro para ver los detalles exactos.")
-    else:
-        st.error("No se encontraron resultados para tu búsqueda.")
-
-# Tabla inferior - Siempre visible como me indicaste previamente
-columnas_tabla = [
-    "NOMBRE DEL TALLER (MAYUSCULAS)", 
-    "CIUDAD BASE", 
-    "LINEAS QUE MANEJAN", 
-    "NUMEROS DE CONTACTO",
-    "COBERTURA INST AA Y LINEA BLANCA"
-]
-st.dataframe(df_filtrado[columnas_tabla], hide_index=True, use_container_width=True)
+    # 4. Tabla Maestra (Siempre visible al final)
+    st.markdown("### 📋 Listado Completo de la Red")
+    columnas_visibles = [
+        "NOMBRE DEL TALLER (MAYUSCULAS)", 
+        "CIUDAD BASE", 
+        "LINEAS QUE MANEJAN", 
+        "NUMEROS DE CONTACTO",
+        "COBERTURA INST AA Y LINEA BLANCA"
+    ]
+    st.dataframe(df_filtrado[columnas_visibles], use_container_width=True, hide_index=True)

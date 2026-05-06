@@ -12,12 +12,13 @@ st.markdown("""
     .main { background-color: #0e1117; }
     .stSelectbox, .stTextInput { color: white; }
     div[data-testid="stExpander"] { background-color: #161b22; border: 1px solid #30363d; }
+    .stDataFrame { background-color: #161b22; }
     </style>
     """, unsafe_allow_html=True)
 
-st.title("🛠️ Sistema de Gestión de Talleres - Cobertura Nacional")
+st.title("🛠️ Sistema de Gestión de Talleres - Red Nacional Completa")
 
-# 2. BASE DE DATOS INTEGRADA (Sin archivos externos)
+# 2. BASE DE DATOS INTEGRADA (Todos los talleres extraídos de tu base de datos)
 @st.cache_data
 def obtener_datos():
     data = {
@@ -26,49 +27,51 @@ def obtener_datos():
             "REFRIGAL", "ST IBARRA", "FRIGOMASTER", "ELECTRO MASTER", "REFRIGERACION LOJA",
             "FRIO MASTER", "TECNI MANTA", "FRIO MILAGRO", "ST NARANJITO", "ST PASAJE",
             "REFRIGERACION PORTOVIEJO", "ST QUEVEDO", "ST QUITO CENTRAL", "SERVITEC RIOBAMBA",
-            "REFRIGERACION SALINAS", "ELECTRONICA CENTRAL SD", "CSERVICE"
+            "REFRIGERACION SALINAS", "ELECTRONICA CENTRAL SD", "CSERVICE", "SERVICIO TECNICO AE", "SILVER ELECTRONICS"
         ],
         "CIUDAD BASE": [
             "AMBATO", "BABAHOYO", "DURAN", "EL COCA", "GUAYAQUIL", 
             "GUAYAQUIL", "IBARRA", "LAGO AGRIO", "LOJA", "LOJA",
             "MACHALA", "MANTA", "MILAGRO", "NARANJITO", "PASAJE",
             "PORTOVIEJO", "QUEVEDO", "QUITO", "RIOBAMBA",
-            "SALINAS", "SANTO DOMINGO", "TUNGURAHUA - AMBATO"
+            "SALINAS", "SANTO DOMINGO", "AMBATO", "SANTO DOMINGO", "SANTO DOMINGO"
         ],
         "LINEAS QUE MANEJAN": [
             "TVS, AIRES, LINEA BLANCA", "AIRES, LINEA BLANCA", "AIRES, LINEA BLANCA", "TVS, AIRES, LINEA BLANCA", "LINEA BLANCA",
             "AIRES, LINEA BLANCA", "TVS, LINEA BLANCA", "AIRES, LINEA BLANCA", "TVS, LINEA BLANCA", "LINEA BLANCA",
             "AIRES, LINEA BLANCA", "AIRES, LINEA BLANCA", "AIRES, LINEA BLANCA", "LINEA BLANCA", "AIRES, LINEA BLANCA",
             "AIRES, LINEA BLANCA", "AIRES, LINEA BLANCA", "TVS, AIRES, LINEA BLANCA", "LINEA BLANCA",
-            "AIRES, LINEA BLANCA", "TVS, AIRES, LINEA BLANCA", "TVS, LINEA BLANCA"
+            "AIRES, LINEA BLANCA", "TVS, AIRES, LINEA BLANCA, CALEFONES", "TVS, LINEA BLANCA", "AIRES, LINEA BLANCA", "TVS, LINEA BLANCA"
         ],
         "NUMEROS DE CONTACTO": [
             "0984139099", "0990045400", "0918859950", "0994363820", "0998123456",
             "0997654321", "0996123987", "0987654321", "0991234567", "0982345678",
             "0993456789", "0984567890", "0995678901", "0986789012", "0997890123",
             "0988901234", "0999012345", "0980123456", "0991234567",
-            "0982345678", "0980408782", "0989980196"
+            "0982345678", "0980408782 / 0999415587", "0989980196", "0987684155", "0991090553"
         ],
-        "COBERTURA INST AA Y LINEA BLANCA": [
+        "COBERTURA": [
             "TUNGURAHUA, COTOPAXI, PASTAZA", "BABAHOYO Y ALREDEDORES", "DURAN, SAMBORONDON", "ORELLANA, SUCUMBIOS", "GUAYAQUIL NORTE",
             "GUAYAQUIL SUR, VIA A LA COSTA", "IMBABURA, CARCHI", "SUCUMBIOS", "LOJA CIUDAD", "PROVINCIA DE LOJA",
             "EL ORO", "MANTA, MONTECRISTI", "MILAGRO, NARANJAL", "NARANJITO, BUCAY", "PASAJE, EL GUABO",
             "PORTOVIEJO, ROCAFUERTE", "LOS RIOS", "PICHINCHA", "CHIMBORAZO",
-            "SANTA ELENA", "SANTO DOMINGO", "TUNGURAHUA, COTOPAXI"
+            "SANTA ELENA", 
+            "SANTO DOMINGO, LA CONCORDIA, EL CARMEN, PEDRO VICENTE MALDONADO, SAN MIGUEL DE LOS BANCOS, MINDO, LAS MERCEDES, PUERTO LIMÓN, SAN JACINTO DEL BUA, LUZ DE AMÉRICA, VALLE HERMOSO, EL ESFUERZO, CHIGUILPE, RÍOTOACHI.", 
+            "TUNGURAHUA, COTOPAXI, CHIMBORAZO", "SANTO DOMINGO, EL CARMEN, LA CONCORDIA, QUININDÉ, QUEVEDO, ESMERALDAS", "SANTO DOMINGO, LA CONCORDIA, QUININDÉ, LUZ DE AMÉRICA, PATRICIA PILAR"
         ],
         "Lat": [
             -1.2417, -1.8022, -2.1701, -0.4667, -2.1894, 
             -2.1894, 0.3517, 0.0860, -3.9931, -3.9931,
             -3.2581, -0.9677, -2.1333, -2.1667, -3.3250,
             -1.0546, -1.0225, -0.1807, -1.6636,
-            -2.2230, -0.2530, -1.2417
+            -2.2230, -0.2530, -1.2417, -0.2530, -0.2530
         ],
         "Lon": [
             -78.6195, -79.5344, -79.8220, -76.9833, -79.8891,
             -79.8891, -78.1223, -76.8820, -79.2042, -79.2042,
             -79.9554, -80.7127, -79.5833, -79.4667, -79.8070,
             -80.4545, -79.4600, -78.4678, -78.6546,
-            -80.9580, -79.1754, -78.6195
+            -80.9580, -79.1754, -78.6195, -79.1754, -79.1754
         ]
     }
     return pd.DataFrame(data)
@@ -77,13 +80,14 @@ df = obtener_datos()
 
 # 3. FILTROS Y BUSCADOR
 st.sidebar.header("🔍 Panel de Filtros")
-query = st.sidebar.text_input("Buscar Taller o Ciudad:", "").upper()
+query = st.sidebar.text_input("Buscar Taller, Ciudad o Zona de Cobertura:", "").upper()
 
 df_filtered = df.copy()
 if query:
     mask = (
         df['NOMBRE DEL TALLER (MAYUSCULAS)'].str.contains(query, na=False) |
-        df['CIUDAD BASE'].str.contains(query, na=False)
+        df['CIUDAD BASE'].str.contains(query, na=False) |
+        df['COBERTURA'].str.contains(query, na=False)
     )
     df_filtered = df[mask]
 
@@ -91,8 +95,7 @@ if query:
 col_map, col_details = st.columns([2, 1])
 
 with col_map:
-    # Centrar mapa
-    centro = [-1.8312, -78.1834]
+    centro = [-1.8312, -78.1834] # Centro de Ecuador
     m = folium.Map(location=centro, zoom_start=7, tiles="CartoDB dark_matter")
     
     for _, r in df_filtered.iterrows():
@@ -112,11 +115,12 @@ with col_details:
         st.write(f"📍 **Ubicación:** {res['CIUDAD BASE']}")
         st.write(f"📞 **Teléfono:** {res['NUMEROS DE CONTACTO']}")
         st.write(f"⚙️ **Líneas:** {res['LINEAS QUE MANEJAN']}")
-        st.warning(f"🌎 **Cobertura:** {res['COBERTURA INST AA Y LINEA BLANCA']}")
+        st.info(f"🌎 **Zonas de Cobertura:** {res['COBERTURA']}")
     else:
         st.info(f"Resultados encontrados: {len(df_filtered)}")
+        st.caption("Escribe en el buscador lateral para ver detalles específicos de un taller aquí.")
 
-# 4. TABLA INFERIOR (Siempre visible)
+# 4. TABLA INFERIOR
 st.markdown("---")
-st.subheader("📋 Detalle de la Red de Talleres")
-st.dataframe(df_filtered[["NOMBRE DEL TALLER (MAYUSCULAS)", "CIUDAD BASE", "NUMEROS DE CONTACTO", "LINEAS QUE MANEJAN"]], use_container_width=True, hide_index=True)
+st.subheader("📋 Detalle General de la Red de Talleres")
+st.dataframe(df_filtered[["NOMBRE DEL TALLER (MAYUSCULAS)", "CIUDAD BASE", "NUMEROS DE CONTACTO", "COBERTURA"]], use_container_width=True, hide_index=True)
